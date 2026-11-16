@@ -124,8 +124,7 @@ named-checkconf
 named-checkzone "$DOMAIN" "$FORWARD_ZONE_FILE"
 named-checkzone "$REVERSE_ZONE" "$REVERSE_ZONE_FILE"
 
-# Habilitar e iniciar BIND9.
-systemctl enable bind9
+#iniciar BIND9.
 systemctl restart bind9
 systemctl --no-pager --full status bind9 || true
 
