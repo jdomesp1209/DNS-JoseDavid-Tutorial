@@ -1,3 +1,67 @@
+#!/usr/bin/env bash
+#
+# Configuración de BIND9 para la práctica DNS:
+#   Zona directa: panes.com
+#   Zona inversa: 6.10.80.in-addr.arpa (red 80.10.6.0/24)
+#
+# Ejecutar EN EL SERVIDOR DNS:
+#   chmod +x configurar_bind9_panes.sh
+#   sudo ./configurar_bind9_panes.sh
+#
+# Opcional: cambiar el hostname:
+#   sudo HOSTNAME_DNS="servidor-P2-TuNombre" ./configurar_bind9_panes.sh
+#
+set -Eeuo pipefail
+
+# ----- Datos de la práctica -----
+DOMAIN="panes.com"
+DNS_HOST="${HOSTNAME_DNS:-servidor-P2-nombre}"
+DNS_IP="80.10.6.1"
+FTP_IP="80.10.6.50"
+WWW_IP="80.10.6.10"
+FORWARD_ZONE_FILE="/etc/bind/db.panes.com"
+REVERSE_ZONE_FILE="/etc/bind/db.panes.com.reverse"
+LOCAL_CONF="/etc/bind/named.conf.local"
+REPORT="${PWD}/informe_dns_panes.txt"
+
+# Para 80.10.6.0/24, la zona inversa es 6.10.80.in-addr.arpa
+REVERSE_ZONE="6.10.80.in-addr.arpa"
+
+if [[ "${EUID}" -ne 0 ]]; then
+    echo "ERROR: ejecuta este script con sudo:"
+    echo "  sudo $0"
+    exit 1
+fi
+
+echo "== Configuración BIND9 para ${DOMAIN} =="
+
+# Establecer el nombre del servidor indicado en la práctica.
+hostnamectl set-hostname "$DNS_HOST"
+
+# Instalar BIND9 y herramientas DNS si no están instaladas.
+export DEBIAN_FRONTEND=noninteractive
+apt-get update
+apt-get install -y bind9 bind9-utils dnsutils
+
+# Copias de seguridad antes de modificar la configuración.
+BACKUP_DIR="/root/backup-bind9-$(date +%Y%m%d-%H%M%S)"
+mkdir -p "$BACKUP_DIR"
+for file in "$LOCAL_CONF" "$FORWARD_ZONE_FILE" "$REVERSE_ZONE_FILE"; do
+    if [[ -f "$file" ]]; then
+        cp -a "$file" "$BACKUP_DIR/"
+    fi
+done
+echo "Copias de seguridad: $BACKUP_DIR"
+
+# Configuración de zona directa e inversa.
+# Se eliminan bloques anteriores creados por este script para evitar duplicados.
+touch "$LOCAL_CONF"
+sed -i '/# BEGIN panes.com managed zones/,/# END panes.com managed zones/d' "$LOCAL_CONF"
+
+cat >> "$LOCAL_CONF" <<EOF
+
+// BEGIN panes.com managed zones
+zone "${DOMAIN}" {
     type master;
     file "${FORWARD_ZONE_FILE}";
     allow-query { any; };
